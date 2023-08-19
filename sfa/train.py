@@ -85,6 +85,7 @@ def main_worker(gpu_idx, configs):
     else:
         configs.subdivisions = int(64 / configs.batch_size)
 
+    # is_mater_node is always true, becuase of not using distributed
     configs.is_master_node = (not configs.distributed) or (
             configs.distributed and (configs.rank % configs.ngpus_per_node == 0))
 

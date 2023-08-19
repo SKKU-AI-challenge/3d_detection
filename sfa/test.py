@@ -6,6 +6,7 @@
 # email: nguyenmaudung93.kstn@gmail.com
 -----------------------------------------------------------------------------------
 # Description: Testing script
+# For inference
 """
 
 import argparse
@@ -34,7 +35,7 @@ from utils.evaluation_utils import decode, post_processing, draw_predictions, co
 from utils.torch_utils import _sigmoid
 import config.kitti_config as cnf
 from data_process.transformation import lidar_to_camera_box
-from utils.visualization_utils import merge_rgb_to_bev, show_rgb_image_with_boxes
+from utils.visualization_utils import merge_rgb_to_bev, show_rgb_image_with_boxes, resize_bev
 from data_process.kitti_data_utils import Calibration
 
 
@@ -80,7 +81,7 @@ def parse_test_configs():
 
     configs.imagenet_pretrained = False
     configs.head_conv = 64
-    configs.num_classes = 3
+    configs.num_classes = 7
     configs.num_center_offset = 2
     configs.num_z = 1
     configs.num_dim = 3
@@ -99,7 +100,7 @@ def parse_test_configs():
     ##############Dataset, Checkpoints, and results dir configs#########
     ####################################################################
     configs.root_dir = '../'
-    configs.dataset_dir = os.path.join(configs.root_dir, 'dataset', 'kitti')
+    configs.dataset_dir = os.path.join(configs.root_dir, 'dataset', '3Dbbox')
 
     if configs.save_test_output:
         configs.results_dir = os.path.join(configs.root_dir, 'results', configs.saved_fn)
@@ -127,7 +128,7 @@ if __name__ == '__main__':
     test_dataloader = create_test_dataloader(configs)
     with torch.no_grad():
         for batch_idx, batch_data in enumerate(test_dataloader):
-            metadatas, bev_maps, img_rgbs = batch_data
+            metadatas, bev_maps = batch_data
             input_bev_maps = bev_maps.to(configs.device, non_blocking=True).float()
             t1 = time_synchronized()
             outputs = model(input_bev_maps)
@@ -149,24 +150,26 @@ if __name__ == '__main__':
             # Rotate the bev_map
             bev_map = cv2.rotate(bev_map, cv2.ROTATE_180)
 
-            img_path = metadatas['img_path'][0]
-            img_rgb = img_rgbs[0].numpy()
-            img_rgb = cv2.resize(img_rgb, (img_rgb.shape[1], img_rgb.shape[0]))
-            img_bgr = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR)
-            calib = Calibration(img_path.replace(".png", ".txt").replace("image_2", "calib"))
-            kitti_dets = convert_det_to_real_values(detections)
-            if len(kitti_dets) > 0:
-                kitti_dets[:, 1:] = lidar_to_camera_box(kitti_dets[:, 1:], calib.V2C, calib.R0, calib.P2)
-                img_bgr = show_rgb_image_with_boxes(img_bgr, kitti_dets, calib)
+            # img_path = metadatas['img_path'][0]
+            # img_rgb = img_rgbs[0].numpy()
+            # img_rgb = cv2.resize(img_rgb, (img_rgb.shape[1], img_rgb.shape[0]))
+            # img_bgr = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR)
+            # calib = Calibration(img_path.replace(".png", ".txt").replace("image_2", "calib"))
+            # kitti_dets = convert_det_to_real_values(detections)
+            # if len(kitti_dets) > 0:
+            #     kitti_dets[:, 1:] = lidar_to_camera_box(kitti_dets[:, 1:], calib.V2C, calib.R0, calib.P2)
+            #     img_bgr = show_rgb_image_with_boxes(img_bgr, kitti_dets, calib)
 
-            out_img = merge_rgb_to_bev(img_bgr, bev_map, output_width=configs.output_width)
+            # TODO: out_img = bev_map, not img_bgr + bev_map
+            # out_img = merge_rgb_to_bev(img_bgr, bev_map, output_width=configs.output_width)
+            out_img = resize_bev(bev_map, output_width=configs.output_width)
 
             print('\tDone testing the {}th sample, time: {:.1f}ms, speed {:.2f}FPS'.format(batch_idx, (t2 - t1) * 1000,
                                                                                            1 / (t2 - t1)))
             if configs.save_test_output:
                 if configs.output_format == 'image':
-                    img_fn = os.path.basename(metadatas['img_path'][0])[:-4]
-                    cv2.imwrite(os.path.join(configs.results_dir, '{}.jpg'.format(img_fn)), out_img)
+                    file_name = metadatas['file_name']
+                    cv2.imwrite(os.path.join(configs.results_dir, '{}.jpg'.format(file_name)), out_img)
                 elif configs.output_format == 'video':
                     if out_cap is None:
                         out_cap_h, out_cap_w = out_img.shape[:2]
