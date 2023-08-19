@@ -6,6 +6,7 @@
 # email: nguyenmaudung93.kstn@gmail.com
 -----------------------------------------------------------------------------------
 # Description: This script for the KITTI dataset
+# For visualization
 """
 
 import sys
@@ -17,6 +18,8 @@ import numpy as np
 from torch.utils.data import Dataset
 import cv2
 import torch
+import open3d as o3d
+import json
 
 src_dir = os.path.dirname(os.path.realpath(__file__))
 while not src_dir.endswith("sfa"):
@@ -42,24 +45,27 @@ class KittiDataset(Dataset):
         assert mode in ['train', 'val', 'test'], 'Invalid mode: {}'.format(mode)
         self.mode = mode
         self.is_test = (self.mode == 'test')
-        sub_folder = 'testing' if self.is_test else 'training'
+        sub_folder = 'test' if self.is_test else 'train'
 
         self.lidar_aug = lidar_aug
+        # TODO: get knowledge of "The probability of horizontal flip"
         self.hflip_prob = hflip_prob
 
-        self.image_dir = os.path.join(self.dataset_dir, sub_folder, "image_2")
+        # self.image_dir = os.path.join(self.dataset_dir, sub_folder, "image_2")
         self.lidar_dir = os.path.join(self.dataset_dir, sub_folder, "velodyne")
-        self.calib_dir = os.path.join(self.dataset_dir, sub_folder, "calib")
-        self.label_dir = os.path.join(self.dataset_dir, sub_folder, "label_2")
-        split_txt_path = os.path.join(self.dataset_dir, 'ImageSets', '{}.txt'.format(mode))
-        self.sample_id_list = [int(x.strip()) for x in open(split_txt_path).readlines()]
+        # self.calib_dir = os.path.join(self.dataset_dir, sub_folder, "calib")
+        self.label_dir = os.path.join(self.dataset_dir, sub_folder, "labels")
+        # TODO: understand split process and edit
+        # split_txt_path = os.path.join(self.dataset_dir, 'ImageSets', '{}.txt'.format(mode))
+        # self.sample_id_list = [int(x.strip()) for x in open(split_txt_path).readlines()]
+        self.dataset_list = [file for file in os.listdir(self.lidar_dir) if file.endswith(".pcd")]
 
         if num_samples is not None:
-            self.sample_id_list = self.sample_id_list[:num_samples]
-        self.num_samples = len(self.sample_id_list)
+            self.dataset_list = self.dataset_list[:num_samples]
+        self.num_samples = len(self.dataset_list)
 
     def __len__(self):
-        return len(self.sample_id_list)
+        return len(self.dataset_list)
 
     def __getitem__(self, index):
         if self.is_test:
@@ -69,28 +75,32 @@ class KittiDataset(Dataset):
 
     def load_img_only(self, index):
         """Load only image for the testing phase"""
-        sample_id = int(self.sample_id_list[index])
-        img_path, img_rgb = self.get_image(sample_id)
-        lidarData = self.get_lidar(sample_id)
+        # sample_id = int(self.sample_id_list[index])
+        # img_path, img_rgb = self.get_image(sample_id)
+        lidarData = self.get_lidar(index)
+        # TODO: maybe need to adjust boundary config
         lidarData = get_filtered_lidar(lidarData, cnf.boundary)
         bev_map = makeBEVMap(lidarData, cnf.boundary)
         bev_map = torch.from_numpy(bev_map)
 
+        # TODO: delete metadatas
         metadatas = {
-            'img_path': img_path,
+            'file_name': self.dataset_list[index][:-4],
         }
 
-        return metadatas, bev_map, img_rgb
+        return metadatas, bev_map
 
     def load_img_with_targets(self, index):
         """Load images and targets for the training and validation phase"""
-        sample_id = int(self.sample_id_list[index])
-        img_path = os.path.join(self.image_dir, '{:06d}.png'.format(sample_id))
-        lidarData = self.get_lidar(sample_id)
-        calib = self.get_calib(sample_id)
-        labels, has_labels = self.get_label(sample_id)
-        if has_labels:
-            labels[:, 1:] = transformation.camera_to_lidar_box(labels[:, 1:], calib.V2C, calib.R0, calib.P2)
+        # sample_id = int(self.sample_id_list[index])
+        # img_path = os.path.join(self.image_dir, '{:06d}.png'.format(sample_id))
+        lidarData = self.get_lidar(index) # numpy shape: (-1, 3)
+        # calib = self.get_calib(sample_id)
+        labels, has_labels = self.get_label(index)
+        
+        # TODO: calibration may not be needed
+        # if has_labels:
+        #     labels[:, 1:] = transformation.camera_to_lidar_box(labels[:, 1:], calib.V2C, calib.R0, calib.P2)
 
         if self.lidar_aug:
             lidarData, labels[:, 1:] = self.lidar_aug(lidarData, labels[:, 1:])
@@ -109,48 +119,64 @@ class KittiDataset(Dataset):
         targets = self.build_targets(labels, hflipped)
 
         metadatas = {
-            'img_path': img_path,
+            'file_name': self.dataset_list[index][:-4],
             'hflipped': hflipped
         }
 
         return metadatas, bev_map, targets
 
-    def get_image(self, idx):
-        img_path = os.path.join(self.image_dir, '{:06d}.png'.format(idx))
-        img = cv2.cvtColor(cv2.imread(img_path), cv2.COLOR_BGR2RGB)
+    # def get_image(self, idx):
+    #     img_path = os.path.join(self.image_dir, '{:06d}.png'.format(idx))
+    #     img = cv2.cvtColor(cv2.imread(img_path), cv2.COLOR_BGR2RGB)
 
-        return img_path, img
+    #     return img_path, img
 
-    def get_calib(self, idx):
-        calib_file = os.path.join(self.calib_dir, '{:06d}.txt'.format(idx))
-        # assert os.path.isfile(calib_file)
-        return Calibration(calib_file)
+    # def get_calib(self, idx):
+    #     calib_file = os.path.join(self.calib_dir, '{:06d}.txt'.format(idx))
+    #     # assert os.path.isfile(calib_file)
+    #     return Calibration(calib_file)
 
+    # TODO: edit get_lidar to get data using file name, figure out the difference of .bin and .pcd
     def get_lidar(self, idx):
-        lidar_file = os.path.join(self.lidar_dir, '{:06d}.bin'.format(idx))
-        # assert os.path.isfile(lidar_file)
-        return np.fromfile(lidar_file, dtype=np.float32).reshape(-1, 4)
-
+        # lidar_file = os.path.join(self.lidar_dir, '{:06d}.bin'.format(idx))
+        pcd_cloud = o3d.io.read_point_cloud(self.dataset_list[idx])
+        pcd2np = np.asarray(pcd_cloud.points)
+        assert pcd2np.shape[1] == 3, "dimension is not correct!"
+        
+        return pcd2np
+    
     def get_label(self, idx):
         labels = []
-        label_path = os.path.join(self.label_dir, '{:06d}.txt'.format(idx))
-        for line in open(label_path, 'r'):
-            line = line.rstrip()
-            line_parts = line.split(' ')
-            obj_name = line_parts[0]  # 'Car', 'Pedestrian', ...
+        # TODO: change .txt to .json
+        json_fName = self.dataset_list[idx].replace(".pcd", "json")
+        label_path = os.path.join(self.label_dir, json_fName)
+        
+        with open(label_path, 'r') as file:
+            try:
+                json_data = json.load(file)
+            except:
+                raise AssertionError(f"Wrong file: {label_path}")
+            
+        data = json_data["Annotation"] # type is List
+        for obj in data:
+            # line = line.rstrip()
+            # line_parts = line.split(' ')
+            obj_name = obj["Label"]  # 'Car', 'Pedestrian', ...
             cat_id = int(cnf.CLASS_NAME_TO_ID[obj_name])
             if cat_id <= -99:  # ignore Tram and Misc
                 continue
-            truncated = int(float(line_parts[1]))  # truncated pixel ratio [0..1]
-            occluded = int(line_parts[2])  # 0=visible, 1=partly occluded, 2=fully occluded, 3=unknown
-            alpha = float(line_parts[3])  # object observation angle [-pi..pi]
-            # xmin, ymin, xmax, ymax
-            bbox = np.array([float(line_parts[4]), float(line_parts[5]), float(line_parts[6]), float(line_parts[7])])
+            # truncated = int(float(line_parts[1]))  # truncated pixel ratio [0..1]
+            # occluded = int(line_parts[2])  # 0=visible, 1=partly occluded, 2=fully occluded, 3=unknown
+            # alpha = float(line_parts[3])  # object observation angle [-pi..pi]
+            # # xmin, ymin, xmax, ymax
+            # bbox = np.array([float(line_parts[4]), float(line_parts[5]), float(line_parts[6]), float(line_parts[7])])
+            
             # height, width, length (h, w, l)
-            h, w, l = float(line_parts[8]), float(line_parts[9]), float(line_parts[10])
+            # h: z, w: y, l: x
+            h, w, l = float(obj["scale"]["z"]), float(obj["scale"]["y"]), float(obj["scale"]["x"])
             # location (x,y,z) in camera coord.
-            x, y, z = float(line_parts[11]), float(line_parts[12]), float(line_parts[13])
-            ry = float(line_parts[14])  # yaw angle (around Y-axis in camera coordinates) [-pi..pi]
+            x, y, z = float(obj["position"]["x"]), float(obj["position"]["y"]), float(obj["position"]["z"])
+            ry = float(obj["rotation"]["z"])  # yaw angle (around Z-axis in AI challenge dataset) [-pi..pi]
 
             object_label = [cat_id, x, y, z, h, w, l, ry]
             labels.append(object_label)
@@ -271,55 +297,55 @@ class KittiDataset(Dataset):
         return bev_map, labels, img_rgb, img_path
 
 
-if __name__ == '__main__':
-    from easydict import EasyDict as edict
-    from data_process.transformation import OneOf, Random_Scaling, Random_Rotation, lidar_to_camera_box
-    from utils.visualization_utils import merge_rgb_to_bev, show_rgb_image_with_boxes
+# if __name__ == '__main__':
+#     from easydict import EasyDict as edict
+#     from data_process.transformation import OneOf, Random_Scaling, Random_Rotation, lidar_to_camera_box
+#     from utils.visualization_utils import merge_rgb_to_bev, show_rgb_image_with_boxes
 
-    configs = edict()
-    configs.distributed = False  # For testing
-    configs.pin_memory = False
-    configs.num_samples = None
-    configs.input_size = (608, 608)
-    configs.hm_size = (152, 152)
-    configs.max_objects = 50
-    configs.num_classes = 3
-    configs.output_width = 608
+#     configs = edict()
+#     configs.distributed = False  # For testing
+#     configs.pin_memory = False
+#     configs.num_samples = None
+#     configs.input_size = (608, 608)
+#     configs.hm_size = (152, 152)
+#     configs.max_objects = 50
+#     configs.num_classes = 3
+#     configs.output_width = 608
 
-    configs.dataset_dir = os.path.join('../../', 'dataset', 'kitti')
-    # lidar_aug = OneOf([
-    #     Random_Rotation(limit_angle=np.pi / 4, p=1.),
-    #     Random_Scaling(scaling_range=(0.95, 1.05), p=1.),
-    # ], p=1.)
-    lidar_aug = None
+#     configs.dataset_dir = os.path.join('../../', 'dataset', 'kitti')
+#     # lidar_aug = OneOf([
+#     #     Random_Rotation(limit_angle=np.pi / 4, p=1.),
+#     #     Random_Scaling(scaling_range=(0.95, 1.05), p=1.),
+#     # ], p=1.)
+#     lidar_aug = None
 
-    dataset = KittiDataset(configs, mode='val', lidar_aug=lidar_aug, hflip_prob=0., num_samples=configs.num_samples)
+#     dataset = KittiDataset(configs, mode='val', lidar_aug=lidar_aug, hflip_prob=0., num_samples=configs.num_samples)
 
-    print('\n\nPress n to see the next sample >>> Press Esc to quit...')
-    for idx in range(len(dataset)):
-        bev_map, labels, img_rgb, img_path = dataset.draw_img_with_label(idx)
-        calib = Calibration(img_path.replace(".png", ".txt").replace("image_2", "calib"))
-        bev_map = (bev_map.transpose(1, 2, 0) * 255).astype(np.uint8)
-        bev_map = cv2.resize(bev_map, (cnf.BEV_HEIGHT, cnf.BEV_WIDTH))
+#     print('\n\nPress n to see the next sample >>> Press Esc to quit...')
+#     for idx in range(len(dataset)):
+#         bev_map, labels, img_rgb, img_path = dataset.draw_img_with_label(idx)
+#         calib = Calibration(img_path.replace(".png", ".txt").replace("image_2", "calib"))
+#         bev_map = (bev_map.transpose(1, 2, 0) * 255).astype(np.uint8)
+#         bev_map = cv2.resize(bev_map, (cnf.BEV_HEIGHT, cnf.BEV_WIDTH))
 
-        for box_idx, (cls_id, x, y, z, h, w, l, yaw) in enumerate(labels):
-            # Draw rotated box
-            yaw = -yaw
-            y1 = int((x - cnf.boundary['minX']) / cnf.DISCRETIZATION)
-            x1 = int((y - cnf.boundary['minY']) / cnf.DISCRETIZATION)
-            w1 = int(w / cnf.DISCRETIZATION)
-            l1 = int(l / cnf.DISCRETIZATION)
+#         for box_idx, (cls_id, x, y, z, h, w, l, yaw) in enumerate(labels):
+#             # Draw rotated box
+#             yaw = -yaw
+#             y1 = int((x - cnf.boundary['minX']) / cnf.DISCRETIZATION)
+#             x1 = int((y - cnf.boundary['minY']) / cnf.DISCRETIZATION)
+#             w1 = int(w / cnf.DISCRETIZATION)
+#             l1 = int(l / cnf.DISCRETIZATION)
 
-            drawRotatedBox(bev_map, x1, y1, w1, l1, yaw, cnf.colors[int(cls_id)])
-        # Rotate the bev_map
-        bev_map = cv2.rotate(bev_map, cv2.ROTATE_180)
+#             drawRotatedBox(bev_map, x1, y1, w1, l1, yaw, cnf.colors[int(cls_id)])
+#         # Rotate the bev_map
+#         bev_map = cv2.rotate(bev_map, cv2.ROTATE_180)
 
-        labels[:, 1:] = lidar_to_camera_box(labels[:, 1:], calib.V2C, calib.R0, calib.P2)
-        img_rgb = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR)
-        img_rgb = show_rgb_image_with_boxes(img_rgb, labels, calib)
+#         labels[:, 1:] = lidar_to_camera_box(labels[:, 1:], calib.V2C, calib.R0, calib.P2)
+#         img_rgb = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR)
+#         img_rgb = show_rgb_image_with_boxes(img_rgb, labels, calib)
 
-        out_img = merge_rgb_to_bev(img_rgb, bev_map, output_width=configs.output_width)
-        cv2.imshow('bev_map', out_img)
+#         out_img = merge_rgb_to_bev(img_rgb, bev_map, output_width=configs.output_width)
+#         cv2.imshow('bev_map', out_img)
 
-        if cv2.waitKey(0) & 0xff == 27:
-            break
+#         if cv2.waitKey(0) & 0xff == 27:
+#             break
