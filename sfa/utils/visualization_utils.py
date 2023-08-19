@@ -152,3 +152,12 @@ def merge_rgb_to_bev(img_rgb, img_bev, output_width):
     out_img[output_rgb_h:, ...] = ret_img_bev
 
     return out_img
+
+def resize_bev(img_bev, output_width) :
+    img_bev_h, img_bev_w = img_bev.shape[:2]
+    ratio_bev = output_width / img_bev_w
+    output_bev_h = int(ratio_bev * img_bev_h)
+
+    ret_img_bev = cv2.resize(img_bev, (output_width, output_bev_h))
+    
+    return ret_img_bev
