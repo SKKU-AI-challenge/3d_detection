@@ -8,10 +8,10 @@ CLASS_NAME_TO_ID = {
     'pedestrian': 0, # Pedestrian => pedestrian
     'car': 1,        # Car => car
     'bicycle': 2,    # cyclist => bicycle       
-    'truck': -3,     # Truck => truck
+    'truck': 5,     # Truck => truck
     'special_vehicle': 3,
     'motorcycle': 4,
-    'bus': -2
+    'bus': 6
 }
 
 colors = [[0, 255, 255], [0, 0, 255], [255, 0, 0], [255, 120, 0],

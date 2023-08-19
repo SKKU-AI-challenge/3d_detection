@@ -122,11 +122,13 @@ def parse_train_configs():
     configs.input_size = (608, 608)
     configs.hm_size = (152, 152)
     configs.down_ratio = 4
+    # TODO: check max number of objects in lida data
     configs.max_objects = 50
 
     configs.imagenet_pretrained = True
     configs.head_conv = 64
-    configs.num_classes = 3
+    # TODO: change num_classes
+    configs.num_classes = 7
     configs.num_center_offset = 2
     configs.num_z = 1
     configs.num_dim = 3
@@ -145,7 +147,8 @@ def parse_train_configs():
     ####################################################################
     ############## Dataset, logs, Checkpoints dir ######################
     ####################################################################
-    configs.dataset_dir = os.path.join(configs.root_dir, 'dataset', 'kitti')
+    # TODO: edit dataset_dir    
+    configs.dataset_dir = os.path.join(configs.root_dir, 'dataset', '3Dbbox')
     configs.checkpoints_dir = os.path.join(configs.root_dir, 'checkpoints', configs.saved_fn)
     configs.logs_dir = os.path.join(configs.root_dir, 'logs', configs.saved_fn)
 
