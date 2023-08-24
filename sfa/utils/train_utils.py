@@ -109,14 +109,14 @@ def plot_lr_scheduler(optimizer, scheduler, num_epochs=300, save_dir='', lr_type
     for _ in range(num_epochs):
         scheduler.step()
         y.append(optimizer.param_groups[0]['lr'])
-    plt.plot(y, '.-', label='LR')
-    plt.xlabel('epoch')
-    plt.ylabel('LR')
-    plt.grid()
-    plt.xlim(0, num_epochs)
-    plt.ylim(0)
-    plt.tight_layout()
-    plt.savefig(os.path.join(save_dir, 'LR_{}.png'.format(lr_type)), dpi=200)
+    # plt.plot(y, '.-', label='LR')
+    # plt.xlabel('epoch')
+    # plt.ylabel('LR')
+    # plt.grid()
+    # plt.xlim(0, num_epochs)
+    # plt.ylim(0)
+    # plt.tight_layout()
+    # plt.savefig(os.path.join(save_dir, 'LR_{}.png'.format(lr_type)), dpi=200)
 
 
 if __name__ == '__main__':

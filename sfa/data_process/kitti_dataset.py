@@ -139,19 +139,24 @@ class KittiDataset(Dataset):
     # TODO: edit get_lidar to get data using file name, figure out the difference of .bin and .pcd
     def get_lidar(self, idx):
         # lidar_file = os.path.join(self.lidar_dir, '{:06d}.bin'.format(idx))
-        pcd_cloud = o3d.io.read_point_cloud(self.dataset_list[idx])
+        lidar_path = os.path.join(self.lidar_dir, self.dataset_list[idx])
+        pcd_cloud = o3d.io.read_point_cloud(lidar_path)
         pcd2np = np.asarray(pcd_cloud.points)
-        assert pcd2np.shape[1] == 3, "dimension is not correct!"
+        intensity_np = np.asarray(pcd_cloud.colors)
+        print(intensity_np[:, 0].min(), intensity_np[:, 0].max())
+        lidarData = np.concatenate([pcd2np, intensity_np[:, 0].reshape(-1, 1)], axis=1)
+        assert lidarData.shape[1] == 4, "dimension is not correct!"
         
-        return pcd2np
+        return lidarData
     
     def get_label(self, idx):
         labels = []
         # TODO: change .txt to .json
-        json_fName = self.dataset_list[idx].replace(".pcd", "json")
+        json_fName = self.dataset_list[idx].replace(".pcd", ".json")
         label_path = os.path.join(self.label_dir, json_fName)
         
-        with open(label_path, 'r') as file:
+        # D:\AI_challenge\3D_detection\dataset\3Dbbox\train\labels\DA_00C_BA_20220902_1_000024.json
+        with open(label_path, 'r', encoding='UTF8') as file:
             try:
                 json_data = json.load(file)
             except:

@@ -1,0 +1,8 @@
+{
+  saved_fn: "test_test",
+  pretrained_path: "../checkpoints/fpn_resnet_18/fpn_resnet_18_epoch_300.pth",
+  no_cuda: true,
+
+  batch_size: 1,
+  save_test_output: true,
+}

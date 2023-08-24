@@ -9,7 +9,10 @@
 """
 
 import os
+import sys
 import argparse
+from jsonargparse import ArgumentParser, ActionConfigFile
+import yaml
 
 import torch
 from easydict import EasyDict as edict
@@ -17,12 +20,15 @@ from easydict import EasyDict as edict
 
 def parse_train_configs():
     parser = argparse.ArgumentParser(description='The Implementation using PyTorch')
+
+    parser.add_argument('--cfg', help="configuration file *.yaml", type=str, required=False, default='D:/AI_challenge/3D_detection/sfa/configs/train.yaml')
+
     parser.add_argument('--seed', type=int, default=2020,
                         help='re-produce the results with seed random')
     parser.add_argument('--saved_fn', type=str, default='fpn_resnet_18', metavar='FN',
                         help='The name using for saving logs, models,...')
 
-    parser.add_argument('--root-dir', type=str, default='../', metavar='PATH',
+    parser.add_argument('--root-dir', type=str, default=os.path.abspath('.'), metavar='PATH',
                         help='The ROOT working directory')
     ####################################################################
     ##############     Model configs            ########################
@@ -110,7 +116,14 @@ def parse_train_configs():
     parser.add_argument('--K', type=int, default=50,
                         help='the number of top K')
 
-    configs = edict(vars(parser.parse_args()))
+    args = parser.parse_args()
+    opt = vars(args)
+    args = yaml.load(open(args.cfg), Loader=yaml.FullLoader)
+    opt.update(args)
+    args = opt
+    # configs = edict(vars(parser.parse_args()))
+    # print("arguments: {}".format(str(args)))
+    configs = edict(args)
 
     ####################################################################
     ############## Hardware configurations #############################

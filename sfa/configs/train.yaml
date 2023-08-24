@@ -1,0 +1,21 @@
+
+saved_fn: "test_fn"            # The name using for saving logs, models,...
+
+# model config
+# pretrained_path: "D:/AI_challenge/3D_detection/checkpoints/fpn_resnet_18/fpn_resnet_18_epoch_300.pth"
+
+# running config
+batch_size: 16
+print_freq: 50
+tensorboard_freq: 50
+checkpoint_freq: 2
+
+# train strategy
+# resume_path: None
+num_epochs: 300
+lr_type: "cosin"
+lr: 0.001
+
+# GPU config
+# gpu_idx: 0,
+no_cuda: True

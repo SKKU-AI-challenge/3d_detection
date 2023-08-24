@@ -11,7 +11,7 @@
 
 import argparse
 import sys
-import os
+import os, yaml
 import time
 import warnings
 
@@ -41,6 +41,7 @@ from data_process.kitti_data_utils import Calibration
 
 def parse_test_configs():
     parser = argparse.ArgumentParser(description='Testing config for the Implementation')
+    parser.add_argument('--cfg', help="configuration file *.yaml", type=str, required=False, default='D:/AI_challenge/3D_detection/sfa/configs/inference.yaml')
     parser.add_argument('--saved_fn', type=str, default='fpn_resnet_18', metavar='FN',
                         help='The name using for saving logs, models,...')
     parser.add_argument('-a', '--arch', type=str, default='fpn_resnet_18', metavar='ARCH',
@@ -69,8 +70,14 @@ def parse_test_configs():
                         help='the video filename if the output format is video')
     parser.add_argument('--output-width', type=int, default=608,
                         help='the width of showing output, the height maybe vary')
+    
+    args = parser.parse_args()
+    opt = vars(args)
+    args = yaml.load(open(args.cfg), Loader=yaml.FullLoader)
+    opt.update(args)
+    args = opt
 
-    configs = edict(vars(parser.parse_args()))
+    configs = edict(args)
     configs.pin_memory = True
     configs.distributed = False  # For testing on 1 GPU only
 
@@ -81,7 +88,7 @@ def parse_test_configs():
 
     configs.imagenet_pretrained = False
     configs.head_conv = 64
-    configs.num_classes = 7
+    configs.num_classes = 3
     configs.num_center_offset = 2
     configs.num_z = 1
     configs.num_dim = 3
@@ -162,7 +169,8 @@ if __name__ == '__main__':
 
             # TODO: out_img = bev_map, not img_bgr + bev_map
             # out_img = merge_rgb_to_bev(img_bgr, bev_map, output_width=configs.output_width)
-            out_img = resize_bev(bev_map, output_width=configs.output_width)
+            # out_img = resize_bev(bev_map, output_width=configs.output_width)
+            out_img = bev_map
 
             print('\tDone testing the {}th sample, time: {:.1f}ms, speed {:.2f}FPS'.format(batch_idx, (t2 - t1) * 1000,
                                                                                            1 / (t2 - t1)))

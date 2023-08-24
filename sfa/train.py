@@ -116,7 +116,7 @@ def main_worker(gpu_idx, configs):
             logger.info('resume training model from checkpoint {}'.format(configs.resume_path))
 
     # Data Parallel
-    model = make_data_parallel(model, configs)
+    # model = make_data_parallel(model, configs)
 
     # Make sure to create optimizer after moving the model to cuda
     optimizer = create_optimizer(configs, model)
